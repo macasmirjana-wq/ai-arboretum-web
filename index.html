@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>AI Arboretum</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700&display=swap" rel="stylesheet">
+<!--
+  AI ARBORETUM - Botanical Intelligence / Tree Recognition System
+  PROTOTYPE v0.1
+
+  Copyright (c) 2026 [AUTHOR NAME]. All rights reserved.
+  Concept, UI design and application flow: [AUTHOR NAME].
+
+  WHAT IS REAL IN THIS PROTOTYPE
+    - Live camera, laser animation, screen flow, map and scan history.
+    - Tree-trunk counting and "Scan tree" target selection: real call to the
+      detection API (YOLO model, /predict endpoint).
+
+  WHAT IS SIMULATED IN THIS PROTOTYPE (marked "SIMULATED" in the code)
+    - Species identification, tree age from bark and stump, leaf health,
+      and place history. These return sample data from small tables below.
+      They are placeholders for models/databases that are not built yet.
+-->
+<style>
+  :root {
+    --g: #2dff6e;
+    --g-mid: rgba(45,255,110,.62);
+    --g-dim: rgba(45,255,110,.32);
+    --g-faint: rgba(45,255,110,.12);
+    --bg: #020a04;
+    --panel: rgba(0,0,0,.78);
+    --nav-h: 76px;
+    --st: env(safe-area-inset-top, 0px);
+    --sb: env(safe-area-inset-bottom, 0px);
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; height: 100%; background: #000; color: var(--g);
+    font-family: "Orbitron", "Courier New", ui-monospace, monospace;
+    overflow: hidden; -webkit-tap-highlight-color: transparent;
+  }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  button:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
+  [hidden] { display: none !important; }
+
+  #app {
+    position: fixed; inset: 0; max-width: 480px; margin: 0 auto; display: flex; flex-direction: column;
+    background: var(--bg); box-shadow: 0 0 0 1px #0a2a12;
+  }
+  #stage { position: relative; flex: 1; min-height: 0; }
+  .screen { position: absolute; inset: 0; display: none; overflow: hidden; }
+  .screen.active { display: block; }
+
+  /* ---------- HOME ---------- */
+  #home {
+    background: radial-gradient(ellipse at 50% 28%, rgba(45,255,110,.13), transparent 60%), var(--bg);
+    text-align: center; padding: calc(var(--st) + 56px) 28px calc(var(--sb) + 28px);
+  }
+  #home.active { display: flex; flex-direction: column; align-items: center; }
+  .logo { width: 128px; height: 128px; filter: drop-shadow(0 0 12px rgba(45,255,110,.75)); }
+  .brand-small { margin-top: 34px; font-size: 26px; letter-spacing: .55em; padding-left: .55em; text-shadow: 0 0 12px var(--g-mid); }
+  .brand { margin: 6px 0 0; font-size: 28px; font-weight: 700; letter-spacing: .4em; padding-left: .4em; text-shadow: 0 0 14px var(--g); }
+  .tag1 { margin-top: 20px; font-size: 11px; letter-spacing: .3em; color: var(--g-mid); }
+  .tag2 { margin-top: 12px; font-size: 9px; letter-spacing: .3em; color: var(--g-dim); }
+  .rule { width: 150px; height: 1px; background: var(--g-dim); margin-top: 8px; }
+  #start {
+    margin-top: auto; width: 100%; height: 56px; background: rgba(45,255,110,.05);
+    border: 2px solid var(--g); border-radius: 3px; font-size: 14px; letter-spacing: .4em; padding-left: .4em;
+    box-shadow: 0 0 16px rgba(45,255,110,.45), inset 0 0 14px rgba(45,255,110,.12);
+  }
+  #start:active { background: var(--g); color: #000; }
+  .req { margin-top: 18px; font-size: 8px; letter-spacing: .25em; line-height: 2; color: var(--g-mid); }
+
+  /* ---------- CAMERA ---------- */
+  #camera { background: #000; }
+  #video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; background: #000; }
+  #overlay { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+  #laser {
+    position: absolute; left: 0; right: 0; top: 0; height: 3px; pointer-events: none;
+    background: var(--g); box-shadow: 0 0 10px 2px var(--g), 0 0 28px 8px rgba(45,255,110,.35);
+    animation: sweep 2.4s ease-in-out infinite alternate;
+  }
+  @keyframes sweep { from { top: 0; } to { top: calc(100% - 3px); } }
+  .corner { position: absolute; width: 46px; height: 46px; border: 0 solid var(--g); pointer-events: none; filter: drop-shadow(0 0 5px var(--g)); }
+  .tl { top: 15%; left: 8%; border-top-width: 3px; border-left-width: 3px; }
+  .tr { top: 15%; right: 8%; border-top-width: 3px; border-right-width: 3px; }
+  .bl { bottom: 21%; left: 8%; border-bottom-width: 3px; border-left-width: 3px; }
+  .br { bottom: 21%; right: 8%; border-bottom-width: 3px; border-right-width: 3px; }
+
+  #count {
+    position: absolute; top: calc(var(--st) + 12px); left: 12px; max-width: calc(100% - 90px);
+    padding: 8px 12px; background: var(--panel); border: 1px solid var(--g);
+    font-size: 11px; font-weight: 700; letter-spacing: .2em; line-height: 1.4;
+  }
+  #status { position: absolute; top: calc(var(--st) + 56px); left: 12px; right: 70px; font-size: 9px; letter-spacing: .1em; color: var(--g-mid); }
+
+  #side { position: absolute; top: calc(var(--st) + 12px); right: 10px; display: flex; flex-direction: column; gap: 12px; }
+  .sbtn {
+    width: 48px; height: 48px; border-radius: 50%; padding: 0; display: grid; place-items: center;
+    background: rgba(0,24,8,.86); border: 1.5px solid var(--g);
+    box-shadow: 0 0 10px rgba(45,255,110,.5);
+  }
+  .sbtn svg { width: 28px; height: 28px; }
+  .sbtn.on { background: var(--g); color: #021; }
+  .sbtn.on svg * { stroke: #021; }
+
+  #lbl {
+    position: absolute; left: 50%; top: 36%; transform: translateX(-50%); min-width: 220px; text-align: center;
+    padding: 12px 18px; background: var(--panel); border: 2px solid var(--g); box-shadow: 0 0 14px rgba(45,255,110,.5);
+  }
+  #lbl .t { font-size: 15px; font-weight: 700; letter-spacing: .3em; color: #fff; padding-left: .3em; }
+  #lbl .s { margin-top: 8px; font-size: 11px; letter-spacing: .25em; color: var(--g); }
+  #big { position: absolute; left: 0; right: 0; top: 58%; text-align: center; padding: 10px 0; background: linear-gradient(transparent, rgba(0,0,0,.7) 25%, rgba(0,0,0,.7) 75%, transparent); text-shadow: 0 0 14px var(--g); }
+  #big small { display: block; font-size: 11px; letter-spacing: .3em; color: #fff; }
+  #big b { display: block; margin-top: 6px; font-size: 30px; letter-spacing: .15em; }
+
+  #scanTree {
+    position: absolute; left: 24px; right: 24px; bottom: 22px; height: 58px; font-size: 17px; letter-spacing: .35em; padding-left: .35em;
+    background: rgba(20,26,22,.88); border: 2px solid var(--g); border-radius: 3px; box-shadow: 0 0 14px rgba(45,255,110,.5);
+  }
+  #scanTree:active { background: var(--g); color: #000; }
+  #scanTree:disabled { opacity: .5; }
+
+  #gate {
+    position: absolute; inset: 0; z-index: 5; background: #000; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 20px; padding: 32px; text-align: center;
+  }
+  #gate p { margin: 0; max-width: 30ch; font-size: 11px; line-height: 1.8; letter-spacing: .08em; color: var(--g-mid); }
+  #allow { height: 52px; padding: 0 26px; background: transparent; border: 2px solid var(--g); border-radius: 3px; font-size: 12px; letter-spacing: .25em; }
+
+  /* ---------- INFO ---------- */
+  #info { background: var(--bg); }
+  .info-grid { display: grid; grid-template-columns: 1fr 112px; height: 100%; }
+  .info-left { padding: calc(var(--st) + 14px) 12px 12px 16px; overflow-y: auto; border-right: 1px solid var(--g-faint); }
+  .info-left h2 { margin: 0 0 10px; font-size: 11px; line-height: 1.5; letter-spacing: .1em; padding-bottom: 8px; border-bottom: 1px solid var(--g-dim); }
+  .info-left p { margin: 0 0 14px; font-size: 9px; line-height: 1.75; letter-spacing: .03em; color: #b9ffd0; }
+  .info-left dt { margin-top: 12px; font-size: 8px; letter-spacing: .25em; color: var(--g-mid); text-align: center; }
+  .info-left dd { margin: 3px 0 0; font-size: 16px; font-weight: 700; letter-spacing: .08em; text-align: center; text-shadow: 0 0 10px var(--g-mid); }
+  .info-left dd.sm { font-size: 12px; }
+  .info-left dd i { font-style: italic; font-weight: 500; }
+  .note { margin-top: 18px; font-size: 7px; letter-spacing: .15em; color: var(--g-dim); text-align: center; }
+  .info-right { display: flex; flex-direction: column; justify-content: space-evenly; align-items: center; padding: calc(var(--st) + 10px) 0 10px; }
+  .scanbtn { background: none; border: 0; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 6px; font-size: 8px; letter-spacing: .2em; }
+  .scanbtn .ring {
+    width: 74px; height: 74px; border-radius: 50%; display: grid; place-items: center;
+    border: 1.5px solid var(--g); background: rgba(0,24,8,.7); box-shadow: 0 0 12px rgba(45,255,110,.4);
+  }
+  .scanbtn .ring svg { width: 36px; height: 36px; }
+  .scanbtn:active .ring { background: var(--g); }
+  .scanbtn:active .ring svg * { stroke: #021; }
+  .info-right hr { width: 70%; border: 0; border-top: 1px solid var(--g-dim); margin: 0; }
+
+  /* ---------- MAP ---------- */
+  #map { background: var(--bg); padding: calc(var(--st) + 18px) 16px 12px; display: none; flex-direction: column; }
+  #map.active { display: flex; }
+  #map h2 { margin: 0 0 14px; text-align: center; font-size: 17px; letter-spacing: .3em; padding-left: .3em; }
+  #grid {
+    position: relative; flex: 0 0 38%; min-height: 200px; border: 1px solid var(--g-dim);
+    background-image: linear-gradient(var(--g-faint) 1px, transparent 1px), linear-gradient(90deg, var(--g-faint) 1px, transparent 1px);
+    background-size: 12.5% 12.5%;
+  }
+  .pin { position: absolute; transform: translate(-50%, -100%); text-align: center; }
+  .pin svg { width: 14px; height: 18px; display: block; margin: 0 auto; filter: drop-shadow(0 0 4px var(--g)); }
+  .pin span { display: block; margin-top: 1px; font-size: 6.5px; letter-spacing: .1em; color: var(--g-mid); white-space: nowrap; }
+  .pin.you svg { width: 18px; height: 22px; }
+  .pin.you span { color: #fff; }
+  .sect { margin: 14px 0 8px; display: flex; justify-content: space-between; font-size: 8px; letter-spacing: .2em; color: var(--g-mid); }
+  .card { padding: 10px 12px; margin-bottom: 8px; border: 1px solid var(--g-dim); border-radius: 4px; background: rgba(45,255,110,.04); }
+  .card.top { border-color: var(--g); }
+  .card .r1 { display: flex; justify-content: space-between; align-items: center; font-size: 9px; letter-spacing: .08em; }
+  .card .r1 b { font-weight: 700; }
+  .card .r2 { margin-top: 5px; font-size: 8px; letter-spacing: .06em; color: var(--g-mid); display: flex; justify-content: space-between; }
+  .card .r3 { margin-top: 3px; font-size: 8px; color: var(--g-mid); }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--g); box-shadow: 0 0 8px var(--g); }
+  #list { overflow-y: auto; flex: 1; min-height: 0; }
+
+  /* ---------- NAV ---------- */
+  #nav {
+    height: calc(var(--nav-h) + var(--sb)); padding: 6px 12px var(--sb); display: grid; grid-template-columns: 1fr 1fr 1fr; align-items: center;
+    background: #000; border-top: 1px solid var(--g-faint);
+  }
+  .nb { background: none; border: 0; display: flex; flex-direction: column; align-items: center; gap: 5px; font-size: 8px; letter-spacing: .2em; color: #9aa; padding: 6px; }
+  .nb svg { width: 22px; height: 22px; }
+  .nb.on { color: var(--g); }
+  #homeBtn { justify-self: center; width: 40px; height: 40px; border-radius: 50%; border: 0; background: var(--g); box-shadow: 0 0 18px var(--g); }
+  #homeBtn:active { transform: scale(.94); }
+
+  #toast {
+    position: absolute; left: 50%; bottom: calc(var(--nav-h) + var(--sb) + 90px); transform: translateX(-50%); z-index: 9;
+    padding: 10px 16px; background: var(--panel); border: 1px solid var(--g); font-size: 11px; font-weight: 700; letter-spacing: .12em;
+    text-align: center; white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity .2s;
+  }
+  #toast.show { opacity: 1; }
+  @media (prefers-reduced-motion: reduce) { #laser { animation-duration: 6s; } }
+</style>
+</head>
+<body>
+
+<div id="app">
+  <main id="stage">
+
+    <!-- HOME -->
+    <section id="home" class="screen active">
+      <svg class="logo" viewBox="0 0 120 120" fill="none" stroke="#2dff6e" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="60" cy="60" r="56" stroke-width="1.5" opacity=".7"/>
+        <path d="M48 66a14 14 0 1 1 8-26 14 14 0 0 1 26 8 14 14 0 0 1 -8 26 14 14 0 0 1 -26 -8z" stroke-width="6"/>
+        <path d="M60 72v24" stroke-width="6"/>
+      </svg>
+      <div class="brand-small">AI</div>
+      <h1 class="brand">ARBORETUM</h1>
+      <div class="tag1">BOTANICAL INTELLIGENCE</div>
+      <div class="tag2">· TREE RECOGNITION SYSTEM ·</div>
+      <div class="rule"></div>
+      <button id="start" type="button">START EXPLORING</button>
+      <div class="req">REQUIRES CAMERA · LOCATION ACCESS<br>ARBORETUM</div>
+    </section>
+
+    <!-- CAMERA (used for tree, leaf, bark and stump scanning) -->
+    <section id="camera" class="screen">
+      <video id="video" playsinline muted autoplay></video>
+      <canvas id="overlay"></canvas>
+      <div id="laser"></div>
+      <div class="corner tl"></div><div class="corner tr"></div><div class="corner bl"></div><div class="corner br"></div>
+      <div id="count">LOOKING FOR TREES...</div>
+      <div id="status"></div>
+      <div id="side"></div>
+      <div id="lbl" hidden><div class="t"></div><div class="s"></div></div>
+      <div id="big" hidden><small>ESTIMATED AGE</small><b></b></div>
+      <button id="scanTree" type="button">SCAN TREE</button>
+      <div id="gate" hidden>
+        <p id="gateMsg">Camera access is needed to scan trees.</p>
+        <button id="allow" type="button">ENABLE CAMERA</button>
+      </div>
+    </section>
+
+    <!-- TREE INFO -->
+    <section id="info" class="screen"></section>
+
+    <!-- MAP -->
+    <section id="map" class="screen">
+      <h2>TREE MAP</h2>
+      <div id="grid"></div>
+      <div id="list"></div>
+    </section>
+
+    <div id="toast" role="status"></div>
+  </main>
+
+  <nav id="nav" hidden>
+    <button class="nb" id="navMap" type="button" aria-label="Map">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2z"/><path d="M9 4v14M15 6v14"/></svg>MAP
+    </button>
+    <button id="homeBtn" type="button" aria-label="Home"></button>
+    <button class="nb" id="navHist" type="button" aria-label="History">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M14 5v14M16.5 9h2M16.5 12h2"/></svg>HISTORY
+    </button>
+  </nav>
+</div>
+
+<canvas id="cap" hidden></canvas>
+
+<script>
+/* =====================================================================
+   SETTINGS
+   ===================================================================== */
+const CFG = {
+  API_URL: 'https://tree-detection-api-fen3.onrender.com/predict',
+  API_KEY: 'MySecretKey123',
+  INTERVAL_MS: 2500,          // how often a frame is sent for counting
+  FIRST_TIMEOUT_MS: 120000,   // first call may be slow while the server wakes up
+  ANALYSIS_MS: 3400,          // duration of the leaf/bark/stump scan animation
+  DEMO_PLACE: null,           // e.g. 'vrsac' to force a place for demos, null = use GPS
+  SHOW_PROTOTYPE_NOTE: true
+};
+
+/* =====================================================================
+   SIMULATED DATA  (placeholders for models and databases not built yet)
+   ===================================================================== */
+// SIMULATED: species identification. Replace with a species classification model.
+const SPECIES = [
+  { name: 'Horse Chestnut', latin: 'Aesculus hippocastanum', family: 'Sapindaceae', age: 125,
+    history: (p) => `The Horse Chestnut (<i>Aesculus hippocastanum</i>) is a large deciduous tree known for its palm-shaped leaves and the glossy "conkers" it drops in autumn. Specimens like this one often line promenades and parks, providing shade and shelter to birds and insects. Located at ${p}.` },
+  { name: 'Pedunculate Oak', latin: 'Quercus robur', family: 'Fagaceae', age: 180,
+    history: (p) => `The Pedunculate Oak (<i>Quercus robur</i>) is a long-lived native of European forests, valued for its hard timber and its role supporting hundreds of insect species. Old oaks often mark historic boundaries and estates. Located at ${p}.` },
+  { name: 'Oriental Plane', latin: 'Platanus orientalis', family: 'Platanaceae', age: 210,
+    history: (p) => `The Oriental Plane (<i>Platanus orientalis</i>) is a broad, shade-giving tree with flaking bark, planted for centuries along squares, fortresses and riverbanks. It tolerates urban conditions well. Located at ${p}.` },
+  { name: 'Small-leaved Linden', latin: 'Tilia cordata', family: 'Malvaceae', age: 95,
+    history: (p) => `The Small-leaved Linden (<i>Tilia cordata</i>) is a classic avenue tree, loved for its fragrant summer flowers that are popular with bees. Located at ${p}.` }
+];
+
+// SIMULATED: place database. Replace with reverse geocoding plus a verified local-history source.
+const PLACES = [
+  { id: 'vrsac', name: 'Vršac City Park', lat: 45.1167, lon: 21.3030,
+    text: 'SAMPLE TEXT: city park, part of the town\'s green promenade.' },
+  { id: 'kalemegdan', name: 'Kalemegdan Fortress', lat: 44.8231, lon: 20.4506,
+    text: 'SAMPLE TEXT: historic fortress park above the confluence of two rivers.' },
+  { id: 'fruska', name: 'Fruška Gora NP', lat: 45.1500, lon: 19.7167,
+    text: 'SAMPLE TEXT: national park with extensive native forest.' }
+];
+const UNKNOWN_PLACE = { id: 'unknown', name: 'Current Location', text: 'No verified local history is stored for this location in the prototype.' };
+
+// SIMULATED demo records so the map is not empty
+const now = Date.now();
+const SEED_SCANS = [
+  { id: 's1', demo: true, ts: now - 3 * 86400000, lat: 45.1167, lon: 21.3030, speciesIdx: 0, place: 'Vršac City Park', status: 'Robust', age: 125 },
+  { id: 's2', demo: true, ts: now - 14 * 60000, lat: 45.1500, lon: 19.7167, speciesIdx: 1, place: 'Fruška Gora NP', status: 'Robust', age: 180 },
+  { id: 's3', demo: true, ts: now - 60 * 60000, lat: 44.8231, lon: 20.4506, speciesIdx: 2, place: 'Kalemegdan Fortress', status: 'Stable', age: 210 }
+];
+
+/* =====================================================================
+   HELPERS AND STATE
+   ===================================================================== */
+const $ = (id) => document.getElementById(id);
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const rnd = (a, b) => Math.floor(a + Math.random() * (b - a + 1));
+const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+let screen = 'home', mode = 'tree';
+let stream = null, busy = false, warm = false, tickTimer = null, analysisToken = 0;
+let lastDets = [], lastSize = { w: 1, h: 1 }, position = null, currentId = null, toastTimer = null;
+let scans = loadScans();
+
+function loadScans() {
+  let saved = [];
+  try { saved = JSON.parse(localStorage.getItem('arboretum_scans') || '[]'); } catch (e) {}
+  return [...saved, ...SEED_SCANS].sort((a, b) => b.ts - a.ts);
+}
+function saveScans() {
+  try { localStorage.setItem('arboretum_scans', JSON.stringify(scans.filter((s) => !s.demo))); } catch (e) {}
+}
+const current = () => scans.find((s) => s.id === currentId) || null;
+
+function toast(msg, ms = 2600) {
+  const t = $('toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), ms);
+}
+function ago(ts) {
+  const m = Math.round((Date.now() - ts) / 60000);
+  if (m < 1) return 'just now';
+  if (m < 60) return m + ' min ago';
+  if (m < 1440) return Math.round(m / 60) + ' hr ago';
+  return Math.round(m / 1440) + ' d ago';
+}
+
+/* ---------- icons ---------- */
+const BR = '<path d="M5 11V6h5M26 6h5v5M31 25v5h-5M10 30H5v-5"/>';
+const ICON = {
+  leaf:  `<svg viewBox="0 0 36 36" fill="none" stroke="#2dff6e" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${BR}<path d="M12 24c0-8 6-12 13-12 0 8-4 13-13 12z"/><path d="M12 24l8-8"/></svg>`,
+  tree:  `<svg viewBox="0 0 36 36" fill="none" stroke="#2dff6e" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${BR}<circle cx="18" cy="15" r="5"/><path d="M18 20v7"/></svg>`,
+  stump: `<svg viewBox="0 0 36 36" fill="none" stroke="#2dff6e" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${BR}<rect x="11" y="13" width="14" height="10" rx="2"/><path d="M14 18h8"/></svg>`,
+  pin:   `<svg viewBox="0 0 14 18" fill="#2dff6e"><path d="M7 0C3.1 0 0 3 0 6.8 0 11.6 7 18 7 18s7-6.4 7-11.2C14 3 10.900 0 7 0zm0 9.500a2.700 2.700 0 1 1 0-5.400 2.700 2.700 0 0 1 0 5.400z"/></svg>`
+};
+const KINDS = { leaf: 'LEAF', bark: 'BARK', stump: 'STUMP' };
+const KIND_ICON = { leaf: 'leaf', bark: 'tree', stump: 'stump' };
+
+/* =====================================================================
+   NAVIGATION
+   ===================================================================== */
+function go(name) {
+  screen = name;
+  ['home', 'camera', 'info', 'map'].forEach((id) => $(id).classList.toggle('active', id === name));
+  $('nav').hidden = name === 'home';
+  $('navMap').classList.toggle('on', name === 'map');
+  $('navHist').classList.toggle('on', name === 'info');
+  if (name === 'camera') startCamera(); else stopCamera();
+  if (name === 'info') renderInfo();
+  if (name === 'map') renderMap();
+}
+
+$('start').addEventListener('click', () => { mode = 'tree'; setMode('tree'); go('camera'); locate(); });
+$('homeBtn').addEventListener('click', () => go('home'));
+$('navMap').addEventListener('click', () => go('map'));
+$('navHist').addEventListener('click', () => {
+  if (!current()) { toast('SCAN A TREE FIRST'); return; }
+  go('info');
+});
+
+/* =====================================================================
+   LOCATION
+   ===================================================================== */
+function locate() {
+  if (!navigator.geolocation) return;
+  navigator.geolocation.getCurrentPosition(
+    (p) => { position = { lat: p.coords.latitude, lon: p.coords.longitude }; },
+    () => { position = null; },
+    { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+  );
+}
+function distKm(a, b) {
+  const R = 6371, rad = (d) => d * Math.PI / 180;
+  const dLat = rad(b.lat - a.lat), dLon = rad(b.lon - a.lon);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+// SIMULATED place lookup: nearest known place within 25 km
+function findPlace() {
+  if (CFG.DEMO_PLACE) return PLACES.find((p) => p.id === CFG.DEMO_PLACE) || UNKNOWN_PLACE;
+  if (!position) return UNKNOWN_PLACE;
+  let best = null, bd = Infinity;
+  PLACES.forEach((p) => { const d = distKm(position, p); if (d < bd) { bd = d; best = p; } });
+  return bd < 25 ? best : UNKNOWN_PLACE;
+}
+
+/* =====================================================================
+   CAMERA
+   ===================================================================== */
+const video = $('video'), overlay = $('overlay'), octx = overlay.getContext('2d'), cap = $('cap');
+
+async function startCamera() {
+  if (stream) { resizeOverlay(); ensureTick(); return; }
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false });
+    video.srcObject = stream;
+    await video.play();
+    $('gate').hidden = true;
+    resizeOverlay(); ensureTick();
+  } catch (e) {
+    stream = null;
+    $('gate').hidden = false;
+    $('gateMsg').textContent = 'Camera unavailable. Allow camera access in your browser and try again.';
+  }
+}
+function stopCamera() {
+  if (stream) { stream.getTracks().forEach((t) => t.stop()); stream = null; video.srcObject = null; }
+  analysisToken++;
+  clearInterval(tickTimer); tickTimer = null;
+}
+$('allow').addEventListener('click', startCamera);
+
+function ensureTick() { if (!tickTimer) tickTimer = setInterval(tick, CFG.INTERVAL_MS); tick(); }
+
+function resizeOverlay() {
+  const dpr = window.devicePixelRatio || 1, r = overlay.getBoundingClientRect();
+  overlay.width = r.width * dpr; overlay.height = r.height * dpr;
+  octx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  draw();
+}
+window.addEventListener('resize', () => { if (screen === 'camera') resizeOverlay(); });
+
+function grabFrame() {
+  const vw = video.videoWidth, vh = video.videoHeight;
+  if (!vw || !vh) return Promise.resolve(null);
+  const s = Math.min(1, 640 / Math.max(vw, vh));
+  const w = Math.round(vw * s), h = Math.round(vh * s);
+  cap.width = w; cap.height = h;
+  cap.getContext('2d').drawImage(video, 0, 0, w, h);
+  return new Promise((res) => cap.toBlob((b) => res(b ? { blob: b, w, h } : null), 'image/jpeg', 0.75));
+}
+
+// REAL: calls the detection API
+async function detect(frame) {
+  const fd = new FormData();
+  fd.append('file', frame.blob, 'frame.jpg');
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), warm ? 30000 : CFG.FIRST_TIMEOUT_MS);
+  try {
+    const r = await fetch(CFG.API_URL, { method: 'POST', headers: { 'x-api-key': CFG.API_KEY }, body: fd, signal: ctrl.signal });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const data = await r.json(); warm = true; return data;
+  } finally { clearTimeout(timer); }
+}
+
+function showCount(n) { $('count').textContent = n === 0 ? 'NO TREES DETECTED' : 'TREES: ' + n; }
+const setStatus = (t) => { $('status').textContent = t || ''; };
+
+async function tick() {
+  if (busy || screen !== 'camera' || mode !== 'tree' || !video.videoWidth) return;
+  busy = true;
+  if (!warm) setStatus('Waking up the server, the first response can take up to 2 minutes...');
+  try {
+    const frame = await grabFrame(); if (!frame) return;
+    const data = await detect(frame);
+    lastDets = data.detections || []; lastSize = { w: frame.w, h: frame.h };
+    showCount(data.tree_count ?? lastDets.length); setStatus(''); draw();
+  } catch (e) {
+    setStatus(e.name === 'AbortError' ? 'Server not responding, retrying...' : 'Error: ' + e.message);
+  } finally { busy = false; }
+}
+
+function mapBox(b) {
+  const r = overlay.getBoundingClientRect(), W = r.width, H = r.height;
+  const sc = Math.max(W / lastSize.w, H / lastSize.h);
+  const ox = (W - lastSize.w * sc) / 2, oy = (H - lastSize.h * sc) / 2;
+  return { x: b[0] * sc + ox, y: b[1] * sc + oy, w: (b[2] - b[0]) * sc, h: (b[3] - b[1]) * sc };
+}
+function draw(hl) {
+  const r = overlay.getBoundingClientRect();
+  octx.clearRect(0, 0, r.width, r.height);
+  if (mode !== 'tree') return;
+  octx.lineWidth = 2; octx.strokeStyle = 'rgba(45,255,110,.8)';
+  lastDets.forEach((d) => { const m = mapBox(d.box); octx.strokeRect(m.x, m.y, m.w, m.h); });
+  if (hl) {
+    const m = mapBox(hl.box);
+    octx.lineWidth = 4; octx.strokeStyle = '#2dff6e'; octx.shadowColor = '#2dff6e'; octx.shadowBlur = 14;
+    octx.strokeRect(m.x, m.y, m.w, m.h); octx.shadowBlur = 0;
+  }
+}
+
+/* ---------- camera modes: tree / leaf / bark / stump ---------- */
+function renderSide() {
+  const el = $('side'); el.innerHTML = '';
+  ['leaf', 'bark', 'stump'].forEach((k) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'sbtn' + (mode === k ? ' on' : '');
+    b.setAttribute('aria-label', 'Scan ' + k); b.innerHTML = ICON[KIND_ICON[k]];
+    b.addEventListener('click', () => {
+      if (!current()) { toast('SCAN A TREE FIRST'); return; }
+      startScan(k);
+    });
+    el.appendChild(b);
+  });
+}
+
+function setMode(m) {
+  mode = m; analysisToken++;
+  const tree = m === 'tree';
+  $('count').hidden = !tree; $('status').hidden = !tree; $('scanTree').hidden = !tree;
+  $('lbl').hidden = tree; $('big').hidden = true;
+  setStatus(''); draw(); renderSide();
+}
+
+// SIMULATED: results of leaf, bark and stump scans. Replace with trained models.
+function simulate(kind, rec) {
+  const base = SPECIES[rec.speciesIdx].age;
+  if (kind === 'leaf') return { text: pick(['HEALTHY', 'HEALTHY', 'HEALTHY', 'MINOR STRESS', 'LEAF MINER DETECTED']) };
+  if (kind === 'bark') return { age: Math.max(5, base + rnd(-6, 6)) };
+  return { age: Math.max(5, base + rnd(-4, 4)) };
+}
+
+async function startScan(kind) {
+  const rec = current(); if (!rec) return;
+  if (screen !== 'camera') go('camera');
+  setMode(kind);
+  const token = analysisToken;
+  const lbl = $('lbl');
+  lbl.querySelector('.t').textContent = KINDS[kind] + ' SCAN';
+  lbl.querySelector('.s').textContent = kind === 'leaf' ? 'STATUS: ANALYZING...' : 'STATUS: CALCULATING AGE';
+  await sleep(CFG.ANALYSIS_MS);
+  if (token !== analysisToken) return;           // user left or switched mode
+  const res = simulate(kind, rec);
+  rec.results = rec.results || {}; rec.results[kind] = res;
+  if (kind === 'leaf') {
+    lbl.querySelector('.s').textContent = 'STATUS: ' + res.text;
+    rec.status = res.text === 'HEALTHY' ? 'Robust' : 'Stressed';
+  } else {
+    lbl.querySelector('.s').textContent = kind === 'stump' ? 'ANALYSIS COMPLETE' : 'STATUS: COMPLETE';
+    $('big').hidden = false; $('big').querySelector('b').textContent = res.age + ' YEARS';
+    rec.age = res.age;
+  }
+  saveScans();
+}
+
+/* ---------- SCAN TREE ---------- */
+$('scanTree').addEventListener('click', async () => {
+  const btn = $('scanTree');
+  if (btn.disabled || !video.videoWidth) return;
+  btn.disabled = true;
+  while (busy) await sleep(200);
+  busy = true; toast('SCANNING TREE...', 8000);
+  try {
+    const frame = await grabFrame();
+    const data = await detect(frame);                      // REAL detection
+    const dets = data.detections || [];
+    lastDets = dets; lastSize = { w: frame.w, h: frame.h }; showCount(dets.length);
+    const cx = frame.w / 2, cy = frame.h / 2;
+    let best = null, bd = Infinity;
+    dets.forEach((d) => {
+      const [x1, y1, x2, y2] = d.box;
+      const inside = cx >= x1 && cx <= x2 && cy >= y1 && cy <= y2;
+      const dist = Math.hypot((x1 + x2) / 2 - cx, (y1 + y2) / 2 - cy) - (inside ? frame.w : 0);
+      if (dist < bd) { bd = dist; best = d; }
+    });
+    if (best && (bd < 0 || bd < frame.w * 0.25)) {
+      draw(best);
+      await sleep(500);
+      const idx = rnd(0, SPECIES.length - 1);              // SIMULATED species identification
+      const place = findPlace();
+      const rec = {
+        id: 'u' + Date.now(), ts: Date.now(),
+        lat: position ? position.lat : (place.lat || 0), lon: position ? position.lon : (place.lon || 0),
+        speciesIdx: idx, place: place.name, placeText: place.text,
+        status: 'Robust', age: SPECIES[idx].age, confidence: best.confidence, results: {}
+      };
+      scans.unshift(rec); currentId = rec.id; saveScans();
+      $('toast').classList.remove('show');
+      go('info');
+    } else {
+      toast('NO TREE IN FOCUS: AIM AT A SINGLE TREE');
+    }
+  } catch (e) {
+    toast('SCAN FAILED, TRY AGAIN');
+  } finally { busy = false; btn.disabled = false; }
+});
+
+/* =====================================================================
+   INFO SCREEN
+   ===================================================================== */
+function renderInfo() {
+  const r = current(); if (!r) return;
+  const sp = SPECIES[r.speciesIdx];
+  const planted = new Date().getFullYear() - r.age;
+  const res = r.results || {};
+  const extra = [];
+  if (res.leaf) extra.push(['LEAF HEALTH', res.leaf.text]);
+  if (res.bark) extra.push(['AGE (BARK SCAN)', res.bark.age + ' YEARS']);
+  if (res.stump) extra.push(['AGE (STUMP SCAN)', res.stump.age + ' YEARS']);
+  const placeNote = r.placeText ? `<p>${esc(r.placeText)}</p>` : '';
+  $('info').innerHTML = `
+    <div class="info-grid">
+      <div class="info-left">
+        <h2>HISTORY OF THE ${esc(r.place.toUpperCase())} ${esc(sp.name.toUpperCase())}</h2>
+        <p>${sp.history(esc(r.place))}</p>${placeNote}
+        <dl>
+          <dt>EST. AGE</dt><dd>${r.age} YEARS</dd>
+          <dt>PLANTED</dt><dd>EST. ${planted}</dd>
+          <dt>SPECIES</dt><dd class="sm">${esc(sp.name.toUpperCase())}</dd>
+          <dt>LATIN NAME</dt><dd class="sm"><i>${esc(sp.latin)}</i></dd>
+          <dt>FAMILY</dt><dd class="sm">${esc(sp.family.toUpperCase())}</dd>
+          <dt>LOCATION</dt><dd class="sm">${esc(r.place.toUpperCase())}</dd>
+          <dt>STATUS</dt><dd class="sm">MATURE</dd>
+          ${extra.map(([k, v]) => `<dt>${k}</dt><dd class="sm">${esc(v)}</dd>`).join('')}
+        </dl>
+        ${CFG.SHOW_PROTOTYPE_NOTE ? '<div class="note">PROTOTYPE · SPECIES AND SCAN VALUES ARE SIMULATED</div>' : ''}
+      </div>
+      <div class="info-right">
+        ${['leaf', 'bark', 'stump'].map((k, i) => `
+          ${i ? '<hr>' : ''}
+          <button class="scanbtn" type="button" data-kind="${k}">
+            <span class="ring">${ICON[KIND_ICON[k]]}</span>SCAN ${KINDS[k]}
+          </button>`).join('')}
+      </div>
+    </div>`;
+  $('info').querySelectorAll('.scanbtn').forEach((b) => b.addEventListener('click', () => startScan(b.dataset.kind)));
+}
+
+/* =====================================================================
+   MAP SCREEN
+   ===================================================================== */
+function renderMap() {
+  const grid = $('grid'); grid.innerHTML = '';
+  const pts = scans.map((s) => ({ s, lat: s.lat, lon: s.lon }));
+  const lats = pts.map((p) => p.lat), lons = pts.map((p) => p.lon);
+  const pad = 0.15;
+  let minLat = Math.min(...lats), maxLat = Math.max(...lats), minLon = Math.min(...lons), maxLon = Math.max(...lons);
+  const dLat = Math.max(maxLat - minLat, 0.02), dLon = Math.max(maxLon - minLon, 0.02);
+  minLat -= dLat * pad; maxLat += dLat * pad; minLon -= dLon * pad; maxLon += dLon * pad;
+  pts.forEach(({ s }) => {
+    const x = ((s.lon - minLon) / (maxLon - minLon)) * 100;
+    const y = (1 - (s.lat - minLat) / (maxLat - minLat)) * 100;
+    const el = document.createElement('div');
+    el.className = 'pin' + (s.id === currentId ? ' you' : '');
+    el.style.left = x + '%'; el.style.top = y + '%';
+    el.innerHTML = ICON.pin + '<span>' + esc(SPECIES[s.speciesIdx].name.split(' ').pop().toUpperCase().slice(0, 8)) + '</span>';
+    grid.appendChild(el);
+  });
+  const top = current() || scans[0];
+  const list = $('list');
+  list.innerHTML = '';
+  if (top) {
+    list.insertAdjacentHTML('beforeend', `
+      <div class="card top"><div class="r1"><span>${esc(top.place.toUpperCase())} · <b>${esc(SPECIES[top.speciesIdx].name.toUpperCase())}</b> · EST. ${top.age} YRS</span><span class="dot"></span></div></div>`);
+  }
+  list.insertAdjacentHTML('beforeend', `<div class="sect"><span>RECENT SCANS</span><span>${scans.length} RECORDS</span></div>`);
+  scans.forEach((s) => {
+    list.insertAdjacentHTML('beforeend', `
+      <div class="card">
+        <div class="r1"><b>${esc(SPECIES[s.speciesIdx].latin.toUpperCase())}</b><span>${ago(s.ts)}</span></div>
+        <div class="r2"><span>${esc(s.place)}</span></div>
+        <div class="r3">${esc(s.status)}${s.demo ? ' · sample record' : ''}</div>
+      </div>`);
+  });
+}
+
+/* ---------- start ---------- */
+setMode('tree');
+</script>
+</body>
+</html>
