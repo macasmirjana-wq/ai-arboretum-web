@@ -79,6 +79,7 @@
   #camera { background: #000; }
   #video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; background: #000; }
   #overlay { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+  #frame { position: absolute; top: 15%; bottom: 21%; left: 8%; right: 8%; pointer-events: none; }
   #laser {
     position: absolute; left: 0; right: 0; top: 0; height: 3px; pointer-events: none;
     background: var(--g); box-shadow: 0 0 10px 2px var(--g), 0 0 28px 8px rgba(45,255,110,.35);
@@ -98,7 +99,7 @@
   }
   #status { position: absolute; top: calc(var(--st) + 56px); left: 12px; right: 70px; font-size: 9px; letter-spacing: .1em; color: var(--g-mid); }
 
-  #side { position: absolute; top: calc(var(--st) + 12px); right: 10px; display: flex; flex-direction: column; gap: 12px; }
+  #side { position: absolute; top: calc(50% - 70px); right: 12px; display: flex; flex-direction: column; gap: 12px; }
   .sbtn {
     width: 48px; height: 48px; border-radius: 50%; padding: 0; display: grid; place-items: center;
     background: rgba(0,24,8,.86); border: 1.5px solid var(--g);
@@ -223,7 +224,7 @@
     <section id="camera" class="screen">
       <video id="video" playsinline muted autoplay></video>
       <canvas id="overlay"></canvas>
-      <div id="laser"></div>
+      <div id="frame"><div id="laser"></div></div>
       <div class="corner tl"></div><div class="corner tr"></div><div class="corner bl"></div><div class="corner br"></div>
       <div id="count">LOOKING FOR TREES...</div>
       <div id="status"></div>
@@ -273,6 +274,7 @@ const CFG = {
   INTERVAL_MS: 2500,          // how often a frame is sent for counting
   FIRST_TIMEOUT_MS: 120000,   // first call may be slow while the server wakes up
   ANALYSIS_MS: 3400,          // duration of the leaf/bark/stump scan animation
+  DEMO_SPECIES: null,         // index in SPECIES (0 to 4) to force one species in demos, null = random (SIMULATED)
   DEMO_PLACE: null,           // e.g. 'vrsac' to force a place for demos, null = use GPS
   SHOW_PROTOTYPE_NOTE: true
 };
@@ -288,6 +290,8 @@ const SPECIES = [
     history: (p) => `The Pedunculate Oak (<i>Quercus robur</i>) is a long-lived native of European forests, valued for its hard timber and its role supporting hundreds of insect species. Old oaks often mark historic boundaries and estates. Located at ${p}.` },
   { name: 'Oriental Plane', latin: 'Platanus orientalis', family: 'Platanaceae', age: 210,
     history: (p) => `The Oriental Plane (<i>Platanus orientalis</i>) is a broad, shade-giving tree with flaking bark, planted for centuries along squares, fortresses and riverbanks. It tolerates urban conditions well. Located at ${p}.` },
+  { name: 'London Plane', latin: 'Platanus × acerifolia', family: 'Platanaceae', age: 120,
+    history: (p) => `The London Plane (<i>Platanus × acerifolia</i>) is a hybrid plane tree widely planted along city streets and in parks because it tolerates pollution and compacted soil, and its bark flakes off in patches. Located at ${p}.` },
   { name: 'Small-leaved Linden', latin: 'Tilia cordata', family: 'Malvaceae', age: 95,
     history: (p) => `The Small-leaved Linden (<i>Tilia cordata</i>) is a classic avenue tree, loved for its fragrant summer flowers that are popular with bees. Located at ${p}.` }
 ];
@@ -322,6 +326,7 @@ const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&l
 
 let screen = 'home', mode = 'tree';
 let stream = null, busy = false, warm = false, tickTimer = null, analysisToken = 0;
+let lastDetTime = 0;
 let lastDets = [], lastSize = { w: 1, h: 1 }, position = null, currentId = null, toastTimer = null;
 let scans = loadScans();
 
@@ -414,7 +419,10 @@ const video = $('video'), overlay = $('overlay'), octx = overlay.getContext('2d'
 async function startCamera() {
   if (stream) { resizeOverlay(); ensureTick(); return; }
   try {
-    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false });
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false
+    });
+    tuneCamera();
     video.srcObject = stream;
     await video.play();
     $('gate').hidden = true;
@@ -424,6 +432,18 @@ async function startCamera() {
     $('gate').hidden = false;
     $('gateMsg').textContent = 'Camera unavailable. Allow camera access in your browser and try again.';
   }
+}
+// Best effort: ask the phone for continuous exposure, white balance and focus (helps in low light)
+async function tuneCamera() {
+  try {
+    const track = stream.getVideoTracks()[0];
+    const caps = track.getCapabilities ? track.getCapabilities() : {};
+    const adv = {};
+    ['whiteBalanceMode', 'exposureMode', 'focusMode'].forEach((k) => {
+      if (caps[k] && caps[k].includes('continuous')) adv[k] = 'continuous';
+    });
+    if (Object.keys(adv).length) await track.applyConstraints({ advanced: [adv] });
+  } catch (e) { /* not supported on this phone/browser */ }
 }
 function stopCamera() {
   if (stream) { stream.getTracks().forEach((t) => t.stop()); stream = null; video.srcObject = null; }
@@ -475,7 +495,7 @@ async function tick() {
   try {
     const frame = await grabFrame(); if (!frame) return;
     const data = await detect(frame);
-    lastDets = data.detections || []; lastSize = { w: frame.w, h: frame.h };
+    lastDets = data.detections || []; lastSize = { w: frame.w, h: frame.h }; lastDetTime = Date.now();
     showCount(data.tree_count ?? lastDets.length); setStatus(''); draw();
   } catch (e) {
     setStatus(e.name === 'AbortError' ? 'Server not responding, retrying...' : 'Error: ' + e.message);
@@ -559,26 +579,35 @@ async function startScan(kind) {
 $('scanTree').addEventListener('click', async () => {
   const btn = $('scanTree');
   if (btn.disabled || !video.videoWidth) return;
+  if (!warm) {
+    toast('SERVER IS WAKING UP, WAIT FOR THE FIRST RESPONSE', 5000);
+    return;
+  }
   btn.disabled = true;
   while (busy) await sleep(200);
   busy = true; toast('SCANNING TREE...', 8000);
   try {
-    const frame = await grabFrame();
-    const data = await detect(frame);                      // REAL detection
-    const dets = data.detections || [];
-    lastDets = dets; lastSize = { w: frame.w, h: frame.h }; showCount(dets.length);
-    const cx = frame.w / 2, cy = frame.h / 2;
+    let dets, size;
+    if (Date.now() - lastDetTime < 4000 && lastDets.length) {
+      dets = lastDets; size = lastSize;                    // reuse what the user just saw on screen
+    } else {
+      const frame = await grabFrame();
+      const data = await detect(frame);                    // REAL detection
+      dets = data.detections || []; size = { w: frame.w, h: frame.h };
+      lastDets = dets; lastSize = size; lastDetTime = Date.now(); showCount(dets.length);
+    }
+    const cx = size.w / 2, cy = size.h / 2;
     let best = null, bd = Infinity;
     dets.forEach((d) => {
       const [x1, y1, x2, y2] = d.box;
       const inside = cx >= x1 && cx <= x2 && cy >= y1 && cy <= y2;
-      const dist = Math.hypot((x1 + x2) / 2 - cx, (y1 + y2) / 2 - cy) - (inside ? frame.w : 0);
+      const dist = Math.hypot((x1 + x2) / 2 - cx, (y1 + y2) / 2 - cy) - (inside ? size.w : 0);
       if (dist < bd) { bd = dist; best = d; }
     });
-    if (best && (bd < 0 || bd < frame.w * 0.25)) {
+    if (best) {
       draw(best);
       await sleep(500);
-      const idx = rnd(0, SPECIES.length - 1);              // SIMULATED species identification
+      const idx = CFG.DEMO_SPECIES !== null ? CFG.DEMO_SPECIES : rnd(0, SPECIES.length - 1);   // SIMULATED species identification
       const place = findPlace();
       const rec = {
         id: 'u' + Date.now(), ts: Date.now(),
