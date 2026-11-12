@@ -27,11 +27,11 @@
 -->
 <style>
   :root {
-    --g: #2dff6e;
-    --g-mid: rgba(45,255,110,.62);
-    --g-dim: rgba(45,255,110,.32);
-    --g-faint: rgba(45,255,110,.12);
-    --bg: #020a04;
+    --g: #39FF6A;
+    --g-mid: rgba(57,255,106,.62);
+    --g-dim: rgba(57,255,106,.32);
+    --g-faint: rgba(57,255,106,.12);
+    --bg: #060C06;
     --panel: rgba(0,0,0,.78);
     --nav-h: 76px;
     --st: env(safe-area-inset-top, 0px);
@@ -57,20 +57,20 @@
 
   /* ---------- HOME ---------- */
   #home {
-    background: radial-gradient(ellipse at 50% 28%, rgba(45,255,110,.13), transparent 60%), var(--bg);
+    background: radial-gradient(ellipse at 50% 28%, rgba(57,255,106,.13), transparent 60%), var(--bg);
     text-align: center; padding: calc(var(--st) + 56px) 28px calc(var(--sb) + 28px);
   }
   #home.active { display: flex; flex-direction: column; align-items: center; }
-  .logo { width: 128px; height: 128px; filter: drop-shadow(0 0 12px rgba(45,255,110,.75)); }
+  .logo { width: 140px; height: 140px; filter: drop-shadow(0 0 4px #39FF6A) drop-shadow(0 0 14px rgba(57,255,106,.7)); }
   .brand-small { margin-top: 34px; font-size: 26px; letter-spacing: .55em; padding-left: .55em; text-shadow: 0 0 12px var(--g-mid); }
   .brand { margin: 6px 0 0; font-size: 28px; font-weight: 700; letter-spacing: .4em; padding-left: .4em; text-shadow: 0 0 14px var(--g); }
   .tag1 { margin-top: 20px; font-size: 11px; letter-spacing: .3em; color: var(--g-mid); }
   .tag2 { margin-top: 12px; font-size: 9px; letter-spacing: .3em; color: var(--g-dim); }
   .rule { width: 150px; height: 1px; background: var(--g-dim); margin-top: 8px; }
   #start {
-    margin-top: auto; width: 100%; height: 56px; background: rgba(45,255,110,.05);
+    margin-top: auto; width: 100%; height: 56px; background: rgba(57,255,106,.05);
     border: 2px solid var(--g); border-radius: 3px; font-size: 14px; letter-spacing: .4em; padding-left: .4em;
-    box-shadow: 0 0 16px rgba(45,255,110,.45), inset 0 0 14px rgba(45,255,110,.12);
+    box-shadow: 0 0 16px rgba(57,255,106,.45), inset 0 0 14px rgba(57,255,106,.12);
   }
   #start:active { background: var(--g); color: #000; }
   .req { margin-top: 18px; font-size: 8px; letter-spacing: .25em; line-height: 2; color: var(--g-mid); }
@@ -82,7 +82,7 @@
   #frame { position: absolute; top: 15%; bottom: 21%; left: 8%; right: 8%; pointer-events: none; }
   #laser {
     position: absolute; left: 0; right: 0; top: 0; height: 3px; pointer-events: none;
-    background: var(--g); box-shadow: 0 0 10px 2px var(--g), 0 0 28px 8px rgba(45,255,110,.35);
+    background: var(--g); box-shadow: 0 0 10px 2px var(--g), 0 0 28px 8px rgba(57,255,106,.35);
     animation: sweep 2.4s ease-in-out infinite alternate;
   }
   @keyframes sweep { from { top: 0; } to { top: calc(100% - 3px); } }
@@ -103,7 +103,7 @@
   .sbtn {
     width: 48px; height: 48px; border-radius: 50%; padding: 0; display: grid; place-items: center;
     background: rgba(0,24,8,.86); border: 1.5px solid var(--g);
-    box-shadow: 0 0 10px rgba(45,255,110,.5);
+    box-shadow: 0 0 10px rgba(57,255,106,.5);
   }
   .sbtn svg { width: 28px; height: 28px; }
   .sbtn.on { background: var(--g); color: #021; }
@@ -111,7 +111,7 @@
 
   #lbl {
     position: absolute; left: 50%; top: 36%; transform: translateX(-50%); min-width: 220px; text-align: center;
-    padding: 12px 18px; background: var(--panel); border: 2px solid var(--g); box-shadow: 0 0 14px rgba(45,255,110,.5);
+    padding: 12px 18px; background: var(--panel); border: 2px solid var(--g); box-shadow: 0 0 14px rgba(57,255,106,.5);
   }
   #lbl .t { font-size: 15px; font-weight: 700; letter-spacing: .3em; color: #fff; padding-left: .3em; }
   #lbl .s { margin-top: 8px; font-size: 11px; letter-spacing: .25em; color: var(--g); }
@@ -121,7 +121,7 @@
 
   #scanTree {
     position: absolute; left: 24px; right: 24px; bottom: 22px; height: 58px; font-size: 17px; letter-spacing: .35em; padding-left: .35em;
-    background: rgba(20,26,22,.88); border: 2px solid var(--g); border-radius: 3px; box-shadow: 0 0 14px rgba(45,255,110,.5);
+    background: rgba(20,26,22,.88); border: 2px solid var(--g); border-radius: 3px; box-shadow: 0 0 14px rgba(57,255,106,.5);
   }
   #scanTree:active { background: var(--g); color: #000; }
   #scanTree:disabled { opacity: .5; }
@@ -148,7 +148,7 @@
   .scanbtn { background: none; border: 0; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 6px; font-size: 8px; letter-spacing: .2em; }
   .scanbtn .ring {
     width: 74px; height: 74px; border-radius: 50%; display: grid; place-items: center;
-    border: 1.5px solid var(--g); background: rgba(0,24,8,.7); box-shadow: 0 0 12px rgba(45,255,110,.4);
+    border: 1.5px solid var(--g); background: rgba(0,24,8,.7); box-shadow: 0 0 12px rgba(57,255,106,.4);
   }
   .scanbtn .ring svg { width: 36px; height: 36px; }
   .scanbtn:active .ring { background: var(--g); }
@@ -170,7 +170,7 @@
   .pin.you svg { width: 18px; height: 22px; }
   .pin.you span { color: #fff; }
   .sect { margin: 14px 0 8px; display: flex; justify-content: space-between; font-size: 8px; letter-spacing: .2em; color: var(--g-mid); }
-  .card { padding: 10px 12px; margin-bottom: 8px; border: 1px solid var(--g-dim); border-radius: 4px; background: rgba(45,255,110,.04); }
+  .card { padding: 10px 12px; margin-bottom: 8px; border: 1px solid var(--g-dim); border-radius: 4px; background: rgba(57,255,106,.04); }
   .card.top { border-color: var(--g); }
   .card .r1 { display: flex; justify-content: space-between; align-items: center; font-size: 9px; letter-spacing: .08em; }
   .card .r1 b { font-weight: 700; }
@@ -184,7 +184,7 @@
     height: calc(var(--nav-h) + var(--sb)); padding: 6px 12px var(--sb); display: grid; grid-template-columns: 1fr 1fr 1fr; align-items: center;
     background: #000; border-top: 1px solid var(--g-faint);
   }
-  .nb { background: none; border: 0; display: flex; flex-direction: column; align-items: center; gap: 5px; font-size: 8px; letter-spacing: .2em; color: #9aa; padding: 6px; }
+  .nb { background: none; border: 0; display: flex; flex-direction: column; align-items: center; gap: 5px; font-size: 8px; letter-spacing: .2em; color: #999999; padding: 6px; }
   .nb svg { width: 22px; height: 22px; }
   .nb.on { color: var(--g); }
   #homeBtn { justify-self: center; width: 40px; height: 40px; border-radius: 50%; border: 0; background: var(--g); box-shadow: 0 0 18px var(--g); }
@@ -206,10 +206,9 @@
 
     <!-- HOME -->
     <section id="home" class="screen active">
-      <svg class="logo" viewBox="0 0 120 120" fill="none" stroke="#2dff6e" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <circle cx="60" cy="60" r="56" stroke-width="1.5" opacity=".7"/>
-        <path d="M48 66a14 14 0 1 1 8-26 14 14 0 0 1 26 8 14 14 0 0 1 -8 26 14 14 0 0 1 -26 -8z" stroke-width="6"/>
-        <path d="M60 72v24" stroke-width="6"/>
+      <svg class="logo" viewBox="31 31 152 152" aria-hidden="true">
+        <rect x="32" y="32" width="150" height="150" rx="75" fill="none" stroke="#39FF6A" stroke-width="2"/>
+        <path d="M97 63.0003C93.2718 62.9814 89.5977 63.8728 86.3109 65.5935C83.0241 67.3142 80.2285 69.8099 78.1777 72.8542C76.1268 75.8985 74.8855 79.3952 74.5664 83.0272C74.2472 86.6593 74.8603 90.3118 76.35 93.6535C72 97.8091 69.5 103.48 69.5 109.445C69.5 121.667 79.5 131.445 92 131.445C94.5 131.445 97 130.907 99.5 130.076V151H109.5V125.431C112 126.116 114.5 126.556 117 126.556C120.611 126.556 124.187 125.86 127.524 124.509C130.86 123.158 133.892 121.177 136.445 118.68C138.999 116.183 141.025 113.219 142.407 109.957C143.789 106.694 144.5 103.198 144.5 99.6668C144.5 96.1357 143.789 92.6392 142.407 89.3769C141.025 86.1146 138.999 83.1504 136.445 80.6536C133.892 78.1567 130.86 76.1761 127.524 74.8248C124.187 73.4735 120.611 72.778 117 72.778H115.7C111.55 66.7158 104.5 63.0003 97 63.0003ZM97 72.778C103.6 72.778 109.05 77.8136 109.5 84.2669C111.8 83.1424 114.5 82.5558 117 82.5558C121.641 82.5558 126.092 84.3586 129.374 87.5675C132.656 90.7764 134.5 95.1287 134.5 99.6668C134.5 104.205 132.656 108.557 129.374 111.766C126.092 114.975 121.641 116.778 117 116.778C112.2 116.778 107.65 114.871 104.3 111.449C103.825 114.303 102.326 116.898 100.073 118.771C97.819 120.643 94.9573 121.669 92 121.667C88.6848 121.667 85.5054 120.379 83.1612 118.087C80.817 115.795 79.5 112.686 79.5 109.445C79.5 102.698 83.5 99.8624 89.5 96.1957C85.5 91.1602 84.5 88.2269 84.5 85.0002C84.5 81.7587 85.817 78.6499 88.1612 76.3578C90.5054 74.0657 93.6848 72.778 97 72.778Z" fill="#39FF6A" fill-rule="evenodd" stroke="#39FF6A" stroke-width="1"/>
       </svg>
       <div class="brand-small">AI</div>
       <h1 class="brand">ARBORETUM</h1>
@@ -355,10 +354,10 @@ function ago(ts) {
 /* ---------- icons ---------- */
 const BR = '<path d="M5 11V6h5M26 6h5v5M31 25v5h-5M10 30H5v-5"/>';
 const ICON = {
-  leaf:  `<svg viewBox="0 0 36 36" fill="none" stroke="#2dff6e" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${BR}<path d="M12 24c0-8 6-12 13-12 0 8-4 13-13 12z"/><path d="M12 24l8-8"/></svg>`,
-  tree:  `<svg viewBox="0 0 36 36" fill="none" stroke="#2dff6e" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${BR}<circle cx="18" cy="15" r="5"/><path d="M18 20v7"/></svg>`,
-  stump: `<svg viewBox="0 0 36 36" fill="none" stroke="#2dff6e" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${BR}<rect x="11" y="13" width="14" height="10" rx="2"/><path d="M14 18h8"/></svg>`,
-  pin:   `<svg viewBox="0 0 14 18" fill="#2dff6e"><path d="M7 0C3.1 0 0 3 0 6.8 0 11.6 7 18 7 18s7-6.4 7-11.2C14 3 10.900 0 7 0zm0 9.500a2.700 2.700 0 1 1 0-5.400 2.700 2.700 0 0 1 0 5.400z"/></svg>`
+  leaf:  `<svg viewBox="0 0 36 36" fill="none" stroke="#39FF6A" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${BR}<path d="M12 24c0-8 6-12 13-12 0 8-4 13-13 12z"/><path d="M12 24l8-8"/></svg>`,
+  tree:  `<svg viewBox="0 0 36 36" fill="none" stroke="#39FF6A" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${BR}<circle cx="18" cy="15" r="5"/><path d="M18 20v7"/></svg>`,
+  stump: `<svg viewBox="0 0 36 36" fill="none" stroke="#39FF6A" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${BR}<rect x="11" y="13" width="14" height="10" rx="2"/><path d="M14 18h8"/></svg>`,
+  pin:   `<svg viewBox="0 0 14 18" fill="#39FF6A"><path d="M7 0C3.1 0 0 3 0 6.8 0 11.6 7 18 7 18s7-6.4 7-11.2C14 3 10.900 0 7 0zm0 9.500a2.700 2.700 0 1 1 0-5.400 2.700 2.700 0 0 1 0 5.400z"/></svg>`
 };
 const KINDS = { leaf: 'LEAF', bark: 'BARK', stump: 'STUMP' };
 const KIND_ICON = { leaf: 'leaf', bark: 'tree', stump: 'stump' };
@@ -512,11 +511,11 @@ function draw(hl) {
   const r = overlay.getBoundingClientRect();
   octx.clearRect(0, 0, r.width, r.height);
   if (mode !== 'tree') return;
-  octx.lineWidth = 2; octx.strokeStyle = 'rgba(45,255,110,.8)';
+  octx.lineWidth = 2; octx.strokeStyle = 'rgba(57,255,106,.8)';
   lastDets.forEach((d) => { const m = mapBox(d.box); octx.strokeRect(m.x, m.y, m.w, m.h); });
   if (hl) {
     const m = mapBox(hl.box);
-    octx.lineWidth = 4; octx.strokeStyle = '#2dff6e'; octx.shadowColor = '#2dff6e'; octx.shadowBlur = 14;
+    octx.lineWidth = 4; octx.strokeStyle = '#39FF6A'; octx.shadowColor = '#39FF6A'; octx.shadowBlur = 14;
     octx.strokeRect(m.x, m.y, m.w, m.h); octx.shadowBlur = 0;
   }
 }
