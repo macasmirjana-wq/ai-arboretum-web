@@ -99,7 +99,7 @@
   }
   #status { position: absolute; top: calc(var(--st) + 56px); left: 12px; right: 70px; font-size: 9px; letter-spacing: .1em; color: var(--g-mid); }
 
-  #side { position: absolute; top: calc(50% - 70px); right: 12px; display: flex; flex-direction: column; gap: 12px; }
+  #side { position: absolute; bottom: calc(21% + 58px); right: 12px; display: flex; flex-direction: column; gap: 12px; }
   .sbtn {
     width: 48px; height: 48px; border-radius: 50%; padding: 0; display: grid; place-items: center;
     background: rgba(0,24,8,.86); border: 1.5px solid var(--g);
@@ -705,7 +705,20 @@ function renderMap() {
   });
 }
 
+/* ---------- wake the server while the user is still on the home screen ---------- */
+async function wakeServer() {
+  try {
+    const base = CFG.API_URL.replace(/\/predict$/, '/');
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), CFG.FIRST_TIMEOUT_MS);
+    const r = await fetch(base, { signal: ctrl.signal });
+    clearTimeout(t);
+    if (r.ok) warm = true;
+  } catch (e) { /* the normal flow will retry and show a status message */ }
+}
+
 /* ---------- start ---------- */
+wakeServer();
 setMode('tree');
 </script>
 </body>
